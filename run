@@ -1,0 +1,3 @@
+#! /bin/bash
+sudo duet status start
+sudo ./duet_collect -f 1000 -d 200 -o -e -g -p /home/dino/new
