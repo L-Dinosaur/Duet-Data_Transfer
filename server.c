@@ -79,7 +79,7 @@ void dostuff (int sock)
 	if(n<0)
 		error("Error: Failed reading from socket");
 	while(buffer != "999") {
-		fprintf(stdout,"%s",buffer);
+		fprintf(output,"%s",buffer);
 		bzero(buffer,256);
 		n = read(sock,buffer,255);
 		if(n<0) 

@@ -1,6 +1,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <dirent.h>
+#include <uuid/uuid.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 void error(const char *msg)
 {
@@ -8,18 +11,30 @@ void error(const char *msg)
 	exit(0);
 }
 
-int main(int argc, char *argv[])
+int main()
 {
-	if(argc < 1)
-		error("Too few arguments\n");
-	char *path = argv[1];
-	DIR *dir = opendir(path);
-	struct dirent *cdir;
-	if(dir == NULL)
-		error("Cannot find directory");
-	while((cdir = readdir(dir)) != NULL) {
-		printf("%s\n", cdir->d_name);
+	/* Declaration */
+	FILE *output;
+	char uuid_char[33];
+	int n,i;
+	if(access("uuid.txt", F_OK) != -1) {
+		output = fopen("uuid.txt", "r");
+		if(output == NULL)
+			error("Error: Can't open uuid.txt\n");
+		n = fscanf(output,"%s", uuid_char);
+		if(!n)
+			error("Error: Failed reading uuid.txt\n");
+		printf("uuid.txt exists, uuid is: %s\n", uuid_char);
 	}
-	closedir(dir);
+	else {
+		uuid_t uuid;
+		output = fopen("uuid.txt", "w");
+		uuid_generate(uuid);
+			
+		for(i=0;i<sizeof(uuid);i++) {
+			fprintf(output, "%02x", uuid[i]);
+		}
+	}
+	fclose(output);	
 	return 0;
 }

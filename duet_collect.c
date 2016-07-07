@@ -9,6 +9,7 @@
  * Free Software Foundation, Inc., 59 Temple Place - Suite 330,
  * Boston, MA 021110-1307, USA.
  */
+/*This is to show*/
 #include "duet_collect.h"
 
 //int count;
@@ -114,7 +115,7 @@ void *sendLog(void *tmp)
 
         // Initializing the server address instance
         portno = 20000;
-        server = gethostbyname("10.70.2.152");
+        server = gethostbyname("192.168.122.1");
         if(server == NULL)
                 error("Error: Did not find server");
         bzero((char *)&serv_addr, sizeof(serv_addr));
@@ -167,7 +168,7 @@ void *sendLog(void *tmp)
 		}
 	}       
     	pthread_exit(NULL);
-	return;
+	//return;
 }
 
 
