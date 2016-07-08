@@ -124,7 +124,7 @@ void *sendLog(void *tmp)
         serv_addr.sin_family = AF_INET;
         bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
         serv_addr.sin_port = htons(portno);
-
+	
 	/* Checking for queue */
 	while(1){
 		if(is_empty(queue)) {
