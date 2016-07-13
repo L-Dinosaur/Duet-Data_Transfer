@@ -20,10 +20,20 @@ void error(const char *msg)
 
 int main(int argc, char *argv[])
 {
+     /* Check for data directory */
+//     DIR *dir = opendir("data");
+//     if(dir)
+//	closedir(dir);
+//     else
+//	mkdir("data",0777);
+
+     /* Declaration */
      int sockfd, newsockfd, portno, pid;
      socklen_t clilen;
      struct sockaddr_in serv_addr, cli_addr;
+     char uuid_char[33];
 
+     char path[256];
      if (argc < 2) {
          fprintf(stderr,"ERROR, no port provided\n");
          exit(1);
@@ -44,6 +54,19 @@ int main(int argc, char *argv[])
               error("ERROR on binding");
      listen(sockfd,5);
      clilen = sizeof(cli_addr);
+	
+
+
+     /* receive uuid */
+     newsockfd = accept(sockfd, 
+          (struct sockaddr *) &cli_addr, &clilen);
+     if (newsockfd < 0) 
+         error("ERROR on accept");
+     bzero(uuid_char, 33);
+     if(read(newsockfd,uuid_char,33)<0)
+		error("Error: Failed reading uuid from socket");
+     printf("uuid is: %s\n", uuid_char);     
+
      while (1) {
          newsockfd = accept(sockfd, 
                (struct sockaddr *) &cli_addr, &clilen);
