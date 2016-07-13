@@ -1,4 +1,3 @@
-//#include "duet_collect.c"
 #include "duet_collect.h"
 int count;
 static volatile int got_sigint = 0;
@@ -60,7 +59,7 @@ int main(int argc, char *argv[])
 	
 	/* Main Body */
 	
-	
+		
 	signal(SIGINT, handle_sigint); // Specify the handler of interrupt signal
 
 	/* Process the options and their arguments */
@@ -187,6 +186,8 @@ int main(int argc, char *argv[])
 
 					/* Extract stat from file */
 					if(stat(ppath, &st)){
+						if(EACCES == errno)
+							printf("no permission\n");
 						fprintf(stderr, "Error: stat failed for %s\n", ppath);
 						ret = 1;
 						goto done_dereg;

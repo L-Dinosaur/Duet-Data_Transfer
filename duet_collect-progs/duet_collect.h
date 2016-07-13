@@ -13,6 +13,14 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <dirent.h>
+#include <uuid/uuid.h>
+#include <fcntl.h>
+#include <errno.h>
+
+
+
+
 
 #define LOG_MAX_SIZE	10000
 #define LOG_MAX_PATH	32
@@ -39,5 +47,6 @@ int is_empty(struct queue *queue);
 void *sendLog(void *tmp);
 void handle_sigint(int signal);
 void usage(int err);
+int find_uuid();
 
 #endif /* _DUET_COLLECT_H */

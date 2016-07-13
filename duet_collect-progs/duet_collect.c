@@ -97,8 +97,35 @@ int is_empty(struct queue *queue)
 		return 0;
 }
 
+int find_uuid()
+{
+	DIR *dir = opendir("/var/log/duet");
+	uuid_t uuid;
+	FILE *output;
+	int i,n;
+	char uuid_char[33];
+	if(dir) 
+		return 0;
+	else if (ENOENT == errno) {
+		mkdir("/var/log/duet", 0777);
+		uuid_generate(uuid);
+		output = fopen("/var/log/duet/uuid.txt", "a+");
+		if(output == NULL)
+			return -1;
+		for(i=0;i<sizeof(uuid);i++) {
+			fprintf(output, "%02x", uuid[i]);
+		}
+		fclose(output);
+		return 0;
+	}
+	else
+		printf("Error: Could not open directory \"/var/log/duet\"");
+		return -2;
+}	
+
 void *sendLog(void *tmp)
 {
+	int i;
         /* Declaration */
 	FILE *output;
         //For reading the log
@@ -112,10 +139,10 @@ void *sendLog(void *tmp)
 	// For queue //
 	struct node *temp;
         /* Initialization */
-
+	char uuid_char[33];
         // Initializing the server address instance
         portno = 20000;
-        server = gethostbyname("192.168.122.1");
+        server = gethostbyname("192.168.122.49");
         if(server == NULL)
                 error("Error: Did not find server");
         bzero((char *)&serv_addr, sizeof(serv_addr));
@@ -125,6 +152,24 @@ void *sendLog(void *tmp)
         bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
         serv_addr.sin_port = htons(portno);
 	
+	/* Access or generate uuid */
+	
+	if(find_uuid() == -1)
+		error("Error: Failed to find \"/var/log/duet/uuid.txt\"");
+	if(find_uuid() == -2)
+		error("Error: Failed to open \"/var/log/duet\"");
+	else {
+		output = fopen("/var/log/duet/uuid.txt","a+");
+		if(output == NULL)
+			error("Error: fopen uuid failed");
+		n = fscanf(output, "%32c", uuid_char);
+		if(!n)
+			error("Error: Failed to read from \"../info/uuid.txt\"");
+		fclose(output);
+		uuid_char[32] = '\0';
+		//null terminating the string		
+	}
+
 	/* Checking for queue */
 	while(1){
 		if(is_empty(queue)) {
@@ -136,7 +181,24 @@ void *sendLog(void *tmp)
 			output = fopen(temp->path, "r+");
 			if(output == NULL) 
 				error("Error: fopen failed");
+			
+
+
+			/* sending uuid */
 			bzero(buffer,256);
+			sockfd = socket(AF_INET, SOCK_STREAM, 0);
+			if(sockfd < 0)
+				error("Error: Failed to open socket");
+			if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
+				error("Error: Failed connection");
+			n = write(sockfd, uuid_char, 33);
+			if(n < 0)
+				error("Error: Failed writing to socket");
+			bzero(buffer,256);
+			close(sockfd);
+			
+
+
 			while(fgets(buffer,256,output) != NULL) {
 				sockfd = socket(AF_INET, SOCK_STREAM, 0);
 				if(sockfd < 0)
