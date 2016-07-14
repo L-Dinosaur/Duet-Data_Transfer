@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
 	}
 
 	if (evtbased)
-		regmask = DUET_PAGE_ADDED | DUET_FILE_TASK;
+		regmask = DUET_PAGE_ADDED | DUET_PAGE_REMOVED | DUET_FILE_TASK;
 	else
 		regmask = DUET_PAGE_EXISTS | DUET_FILE_TASK;
 
@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
 					}
 					
 					if (!tmp){
-						fprintf(stdout, "Getpath code %d (evt %x). Got %s, line: %lli\n", tmp, buf[c].state, path,counter);
+						fprintf(stdout, "Getpath code %d (evt %x). Got %s, line: %lli\n", tmp, buf[c].state, ppath,counter);
 						fprintf(output, "%d,%x,%s,%lu,%lu\n",tmp, buf[c].state, ppath, buf[c].idx, (unsigned long) st.st_size);
 						/*
 						1. getpath code
