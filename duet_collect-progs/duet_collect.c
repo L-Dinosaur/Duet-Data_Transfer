@@ -32,6 +32,20 @@ struct queue *init_queue()
         return queue;
 }
 
+void check_dir(const char *path)
+{
+        DIR * dir;
+        int n;
+        dir = opendir(path);
+        if(dir == NULL){
+                n = mkdir(path, 0777) == -1;
+                if(n<0)
+                        error("Error: Failed to create directory");
+        }
+        else
+                closedir(dir);
+}
+
 
 void enqueue(struct queue *queue, struct node *node)
 {
@@ -100,6 +114,29 @@ int is_empty(struct queue *queue)
 		return 0;
 }
 
+void get_date(struct date * date)
+{
+        time_t timeval;
+        struct tm * l_time;
+        char mon_char[2];
+        time(&timeval);
+        l_time = localtime(&timeval);
+        int year = l_time->tm_year + 1900;
+        int month = l_time->tm_mon + 1;
+        int day = l_time->tm_mday;
+        sprintf(date->year, "%d", year);
+        if(month < 10) {
+                sprintf(date->month, "0%d", month);
+        }
+        else
+                sprintf(date->month, "%d", month);
+        sprintf(date->day, "%d", day);
+	sprintf(date->date, "%s%s%s", date->year, date->month, date->day);
+
+}
+
+
+
 FILE *find_uuid()
 {
 	DIR *dir = opendir("/var/log/duet");
@@ -134,20 +171,30 @@ FILE *find_uuid()
 }	
 void *sendLog(void *tmp)
 {
-	int i, outfd;
         /* Declaration */
+	int i, outfd;
 	FILE *output;
+
         //For reading the log
-        char * buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
+        char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
+	bzero(buffer, BUFFERSIZE);
 	struct queue * queue = (struct queue*)tmp;
+	
         // For sending data through socket
         int sockfd, portno, n;
         struct sockaddr_in serv_addr;
         struct hostent *server;
+
 	// For queue //
 	struct node *temp;
-        /* Initialization */
-	char uuid_char[UUIDSIZE];
+
+        /* Meta data */
+	char uuid_char[UUIDSIZE+1];
+	struct date date;
+	char *u_ptr = buffer, *date_ptr = u_ptr + UUIDSIZE, *ofs_ptr = date_ptr + DATESIZE, *data_ptr = ofs_ptr + sizeof(uint32_t);
+	uint32_t *offset = (uint32_t *)ofs_ptr;
+	
+	
         // Initializing the server address instance
         portno = 20000;
         server = gethostbyname("192.168.122.65");
@@ -160,6 +207,8 @@ void *sendLog(void *tmp)
         bcopy((char *)server->h_addr, (char *)&serv_addr.sin_addr.s_addr, server->h_length);
         serv_addr.sin_port = htons(portno);
 	
+
+
 	/* Checking for queue */
 	while(1){
 		if(is_empty(queue)) {
@@ -169,27 +218,31 @@ void *sendLog(void *tmp)
 		else {
 			temp = dequeue(queue);
 			outfd = open(temp->path, O_CREAT | O_RDWR);
-			if(output < 0) 
+			if(outfd < 0) 
 				error("open");
-			/* setting up the socket */
-			sockfd = socket(AF_INET, SOCK_STREAM, 0);
-			if(sockfd < 0)
-				error("socket");
-			if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-				error("connect");
 
 
+			/* preparing the meta data */
+			// uuid
+			output = find_uuid();
+			if(output == NULL)
+				error("find_uuid");
+			n = fscanf(output, "%s", u_ptr);
+			
+			if(n<=0)
+				error("fscanf");
 
-			/* sending the uuid */
-			n = write(sockfd, uuid_char, UUIDSIZE);
-			if(n < 0)
-				error("write");
+			// date
+			get_date(&date);
+			n = sprintf(date_ptr, "%s", date.date);
+			if(n<=0)
+				error("sprintf");
+			
+			//offset
+			*offset = 0;
+			
+			while((i = read(outfd, data_ptr, DATASIZE)) > 0) {
 
-
-			/* sending data */
-			bzero(buffer,BUFFERSIZE);
-			close(sockfd);
-			while(read(outfd, buffer, BUFFERSIZE) > 0) {
 				sockfd = socket(AF_INET, SOCK_STREAM, 0);
 				if(sockfd < 0)
 					error("socket");
@@ -198,12 +251,11 @@ void *sendLog(void *tmp)
 				n = write(sockfd, buffer, BUFFERSIZE);
 				if(n < 0)
 					error("write");
-				bzero(buffer,BUFFERSIZE);
+				printf("sent %d\n", n);	
+				*offset += n;
 				close(sockfd);
 			}
-			/* Clean up after the used file */
-			//freopen(temp->path, "w", output);
-			//fclose(output);			
+			close(outfd);
 			temp->safe = 1;
 
 		}
