@@ -1,4 +1,4 @@
-#include "duet_collect.h"
+#include "duettel.h"
 int count;
 static volatile int got_sigint = 0;
 
@@ -16,7 +16,7 @@ int main(int argc, char *argv[])
 	/* Original Declaration */
 	unsigned long long counter = 0;
 					
-	int freq = 10, duration = 0, o3 = 0, evtbased = 0, getpath = 0;
+	int freq = 10, duration = 0, o3 = 0, evtbased = 0, getpath = 0, n;
 	int keep_running = 0;
 	char path[DUET_MAX_PATH] = "/";
 	int ret = 0, tid, c, duet_fd = 0, itret = 0, tmp;
@@ -48,9 +48,10 @@ int main(int argc, char *argv[])
 	struct queue *queue = init_queue();
 	char log_path[LOG_MAX_PATH];
 	int i, size = MAX_LOGS;
+	check_dir("/media/data");
 	for(i=0;i<size;i++) {
 		logs[i] = (struct node *)malloc(sizeof(struct node));
-		sprintf(log_path, "%d", i);
+		sprintf(log_path, "/media/data/%d", i);
 		strcpy(logs[i]->path, log_path);
 		strcat(logs[i]->path, ".txt");
 		logs[i]->safe = 1;
@@ -171,30 +172,24 @@ int main(int argc, char *argv[])
 			
 			if (getpath) {
 				for (c = 0; c < itret; c++) {
-					tmp = duet_get_path(duet_fd, tid, buf[c].uuid, rpath);
+					tmp = duet_get_path(duet_fd, tid, buf[c].uuid, ppath);
 					if (tmp < 0) {
 						fprintf(stderr, "Error: Duet get_path failed\n");
 						ret = 1;
 						goto done_dereg;
 					}
-					/* Find and format the path into a string */
-					strcpy(ppath, path);
-					strcat(ppath, "/");
-					strcat(ppath, rpath);
-					
-					/*incrementing the internal counter */
-
 					/* Extract stat from file */
-					if(stat(ppath, &st)){
-						if(EACCES == errno)
-							printf("no permission\n");
+					if((n=stat(ppath, &st))){
+						perror("stat");
+						//if(EACCES == errno)
+						//	printf("no permission\n");
 						fprintf(stderr, "Error: stat failed for %s\n", ppath);
 						ret = 1;
 						goto done_dereg;
 					}
 					
 					if (!tmp){
-						fprintf(stdout, "Getpath code %d (evt %x). Got %s, line: %lli\n", tmp, buf[c].state, ppath,counter);
+						//fprintf(stdout, "Getpath code %d (evt %x). Got %s, line: %lli\n", tmp, buf[c].state, ppath,counter);
 						fprintf(output, "%d,%x,%s,%lu,%lu\n",tmp, buf[c].state, ppath, buf[c].idx, (unsigned long) st.st_size);
 						/*
 						1. getpath code
@@ -207,7 +202,7 @@ int main(int argc, char *argv[])
 						counter += 1;
 					}
 					else{
-						fprintf(stdout, "Getpath code %d (evt %x).\n", tmp, buf[c].state);
+						//fprintf(stdout, "Getpath code %d (evt %x).\n", tmp, buf[c].state);
 						fprintf(output, "%d,%x\n", tmp, buf[c].state);
 						/*
 						1. getpath code

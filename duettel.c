@@ -10,7 +10,7 @@
  * Boston, MA 021110-1307, USA.
  */
 /*This is to show*/
-#include "duet_collect.h"
+#include "duettel.h"
 
 //int count;
 
@@ -130,11 +130,31 @@ void get_date(struct date * date)
         }
         else
                 sprintf(date->month, "%d", month);
-        sprintf(date->day, "%d", day);
+	if(day < 10)
+		sprintf(date->day, "0%d", day);
+	else
+		sprintf(date->day, "%d", day);
 	sprintf(date->date, "%s%s%s", date->year, date->month, date->day);
 
 }
 
+FILE *create_uuid()
+{
+	FILE *output;
+	uuid_t uuid;
+	int i;
+	uuid_generate(uuid);
+        output = fopen("/var/log/duet/uuid.txt", "a+");
+        if(output == NULL)
+	        error("fopen");
+        for(i=0;i<sizeof(uuid);i++) {
+                fprintf(output, "%02x", uuid[i]);
+        }
+        fclose(output);
+        output = fopen("/var/log/duet/uuid.txt", "r");
+        return output;
+
+}
 
 
 FILE *find_uuid()
@@ -146,23 +166,21 @@ FILE *find_uuid()
 	char uuid_char[UUIDSIZE];
 	if(dir) {
 		output = fopen("/var/log/duet/uuid.txt", "r");	
-		if(output == NULL)
-			error("fopen1");
-		return output;
+		if(output == NULL){
+			if(ENOENT == errno) {
+				output = create_uuid();
+			}
+			else	
+				error("fopen");
+		}
+		else
+			return output;
 	}
 	else if (ENOENT == errno) {
 		n = mkdir("/var/log/duet", 0777);
 		if(n<0)
 			error("mkdir");
-		uuid_generate(uuid);
-		output = fopen("/var/log/duet/uuid.txt", "a+");
-		if(output == NULL)
-			error("fopen2");
-		for(i=0;i<sizeof(uuid);i++) {
-			fprintf(output, "%02x", uuid[i]);
-		}
-		fclose(output);
-		output = fopen("/var/log/duet/uuid.txt", "r");
+		output = create_uuid();
 		return output;
 	}
 	else
@@ -174,6 +192,10 @@ void *sendLog(void *tmp)
         /* Declaration */
 	int i, outfd;
 	FILE *output;
+	long readed = 0, msec = 0;
+	struct timeval * tv1 = (struct timeval *)malloc(sizeof(struct timeval));
+	struct timeval * tv2 = (struct timeval *)malloc(sizeof(struct timeval));
+	struct timeval * res = (struct timeval *)malloc(sizeof(struct timeval));
 
         //For reading the log
         char *buffer = (char *)malloc(BUFFERSIZE * sizeof(char));
@@ -216,6 +238,7 @@ void *sendLog(void *tmp)
 			continue;
 		}
 		else {
+			gettimeofday(tv1, NULL);
 			temp = dequeue(queue);
 			outfd = open(temp->path, O_CREAT | O_RDWR);
 			if(outfd < 0) 
@@ -237,29 +260,34 @@ void *sendLog(void *tmp)
 			n = sprintf(date_ptr, "%s", date.date);
 			if(n<=0)
 				error("sprintf");
-			
+				
 			//offset
 			*offset = 0;
-			
+			readed = 0;
 			while((i = read(outfd, data_ptr, DATASIZE)) > 0) {
-
 				sockfd = socket(AF_INET, SOCK_STREAM, 0);
 				if(sockfd < 0)
 					error("socket");
 				if(connect(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
 					error("connect");
-				n = write(sockfd, buffer, BUFFERSIZE);
+				n = write(sockfd, buffer, i+METASIZE);
+				readed += n;
 				if(n < 0)
 					error("write");
 				printf("sent %d\n", n);	
 				*offset += n;
 				close(sockfd);
 			}
+			gettimeofday(tv2, NULL);
+			timersub(tv2,tv1,res);
+			msec = res->tv_sec * 1000000 + res->tv_usec;
+			printf("%lumb/s\n", readed/msec);
 			close(outfd);
 			temp->safe = 1;
 
 		}
 	}       
+	free(tv1);
     	pthread_exit(NULL);
 	//return;
 }
@@ -282,11 +310,11 @@ void usage(int err)
 {
 	fprintf(stderr,
 		"\n"
-		"dummy is a program meant to demonstrate how to use the Duet\n"
-		"framework. For development purposes, it can also be used during\n"
-		"testing.\n"
+		"Duet telemetry is a program written based on the Duet dummy\n"
+		"task. It uses the event collecting Duet framework to collect\n"
+		"file usage/modification data for the study of cache patterns\n"
 		"\n"
-		"Usage: dummy [OPTION]...\n"
+		"Usage: duettel [OPTION]...\n"
 		"\n"
 		"Program Options\n"
 		" -f <freq>     event fetching frequency in msec (def: 10ms)\n"
